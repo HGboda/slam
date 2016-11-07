@@ -37,6 +37,12 @@ from pylab import *
 # line_g=ax_g.plot(debugx1,debugy1,'*')
 
 
+#debug
+global debugshow
+debugshow = False
+global particle_cnt
+particle_cnt = 0
+#debug
 
 
 
@@ -119,12 +125,16 @@ class Particles:
           e1=g*k1*alpha
           e2=g*k2*deltaS
           e3=g*k1*(deltaPhi-alpha)
-          #print '\n# alpha,deltaS,deltaphi,e1,e2,e3:',alpha,deltaS,deltaPhi,e1,e2,e3
+          # print '\n# alpha,deltaS,deltaphi,e1,e2,e3:',alpha,deltaS,deltaPhi,e1,e2,e3,'g',g
           self.X[k]+=((deltaS+e2)*self.cos(self.Theta[k]+alpha+e1))
           self.Y[k]+=((deltaS+e2)*self.sin(self.Theta[k]+alpha+e1))
           self.Theta[k]+=(deltaPhi+e1+e3)
           #Bound the angle between -pi to pi
           self.Theta[k] = self.boundAngle(self.Theta[k])
+
+          #debug
+          # print 'update particle count %d particle x %f particle y %f particle theta %f' %(k,self.X[k],self.Y[k],self.Theta[k])
+          #debug
           
     def boundAngle(self,phi):
         from math import fmod,pi
@@ -238,6 +248,10 @@ def updateBeliefs(x0,y0,x1,y1):
     if(d>49 and (Type=='0' or Type=='-1' or Type=='1')):
         return
     
+    if debugshow == True:
+        logf.write('-------------------\n')
+        logf.write('updateBeliefs x0 %f y0 %f x1 %f y1 %f \n' %(x0,y0,x1,y1))
+
     for K in range(int(d*10.0)):
         k = K/10.0
         x = int((x0 + ((x1-x0)/fabs(x1-x0))*fabs(k*cos(t)))/cellSize)
@@ -250,6 +264,10 @@ def updateBeliefs(x0,y0,x1,y1):
         #so that the map is more visible (note X-axis in the array is the Y axis in the image.
         x += int(gridSize/(cellSize*6))
         y += int(gridSize/(cellSize*2))
+
+        if debugshow == True:
+            logf.write('updateBeliefs d %f k %f x %f y %f \n' %(d,k,x,y))
+
         if(k==0.0 and x>=0 and x<int(gridSize/cellSize) and y>=0 and y<int(gridSize/cellSize)):
             if(x<xStart):
                 xStart=x
@@ -259,11 +277,17 @@ def updateBeliefs(x0,y0,x1,y1):
                 xEnd=x
             if(y>yEnd):
                 yEnd=y
+    
+            if debugshow == True:
+                logf.write('updateBeliefs k %f x %f y %f xStart %f yStart %f xEnd %f yEnd %f \n' %(k,x,y,xStart,yStart,xEnd,yEnd))
         
         # decrement the value in the corresponding cell (if it is within our map)
         if(x>=0 and x<int(gridSize/cellSize) and y>=0 and y<int(gridSize/cellSize) and k >0.0):
             Grid[x][y] -= dec
 
+
+            if debugshow == True:
+                logf.write('updateBeliefs k %f x %f y %f dec %f Grid[x][y]  %f \n' %(k,x,y,dec,Grid[x][y] ))
 
     #increment the occupancy belief of the cell lying on the endpoint of the laser
     x = int(round(x1/cellSize))
@@ -274,6 +298,10 @@ def updateBeliefs(x0,y0,x1,y1):
     x += int(gridSize/(cellSize*6))
     y += int(gridSize/(cellSize*2))
     # increase occupancy belief if the points lie within the map
+
+    if debugshow == True:
+        logf.write('updateBeliefs x %f y %f \n' %(x,y))
+
     if(x>=0 and x<int(gridSize/cellSize) and y>=0 and y<int(gridSize/cellSize)):
         if(x>xEnd):
             xEnd=x
@@ -283,7 +311,12 @@ def updateBeliefs(x0,y0,x1,y1):
             xStart=x
         if(y<yStart):
             xStart=y
-            Grid[x][y] += inc
+        
+        Grid[x][y] += inc
+
+        if debugshow == True:
+            logf.write('updateBeliefs x %f y %f inc %f xStart %f yStart %f xEnd %f yEnd %f  Grid[x][y] %f \n' %(x,y,inc,xStart,yStart,xEnd,yEnd, Grid[x][y]))
+        
 
     
 #Use the Banana Shaped Gaussian Distribution to decide which cells to update and by how much.
@@ -450,19 +483,19 @@ def writeImage(grid,fileName=None):
             green = 0
             # such high negative values of the grid cells mostly indicate the robot was present in this cell at some point.
             # coz we had set the cell value to -999999 then.
-            if(belief < - 666666):
+            if(belief < - 666666):#blue
                 red = 0 
                 green = 0
                 blue = 255
-            if(belief > -666666 and belief < 0):
+            if(belief > -666666 and belief < 0):#white
                 red = 255
                 blue = 255
                 green = 255
-            if(belief == 0.0):
+            if(belief == 0.0):#gray
                 red = 170
                 blue = 170
                 green = 170
-            if(belief > 30.0):
+            if(belief > 30.0):#black
                 red = 0
                 blue = 0
                 green = 0
@@ -519,6 +552,12 @@ LaserD = []
 
 global SonarD
 SonarD = []
+global OdoD
+OdoD = []
+
+if debugshow == True:
+    logf = open("computeWeight.txt","a") 
+
 
 def main(datafile='unlocalized.data',cell_Size=0.1,Typ='1'):
     global Type
@@ -529,6 +568,7 @@ def main(datafile='unlocalized.data',cell_Size=0.1,Typ='1'):
     global numReadings
     global cellSize
     global xStart,xEnd,yStart,yEnd
+
     numReadings = len(L)
     print '\nNumber of samples:',len(L)
     gridSize = 50.0
@@ -541,6 +581,9 @@ def main(datafile='unlocalized.data',cell_Size=0.1,Typ='1'):
     else:
         Onew = getInterpolatedOdometry(S,O)
 
+
+    global OdoD
+    OdoD = Onew    
     #initialize the canvas in a new thread  
     # thread.start_new_thread(initializeCanvas,())
     # thread.start_new_thread(realplot,())
@@ -561,15 +604,17 @@ def main(datafile='unlocalized.data',cell_Size=0.1,Typ='1'):
     #Create the Particle Filter
     particlesObj = Particles(numParticles,Onew[0][1],Onew[0][2],Onew[0][3])
     print 'len(S)',len(S),' len(O)',len(O)
+   
+    #real plot
     fig = plt.figure()
     ax1 = fig.add_subplot(1, 1, 1)
-    # ln, = plt.plot([])
-    # plt.ion()
-    # plt.show(False)
+   
     plt.ion()
     plt.show(False)    
-        
+    #real plot
+
     for k in range(len(S)):
+    # for k in range(10):    
         #discarding time-stamps 
         # print '\n Reading:',k
         Snew = None
@@ -613,15 +658,17 @@ def main(datafile='unlocalized.data',cell_Size=0.1,Typ='1'):
             # plt.scatter(debugx1,debugy1,marker='*')
             # plt.show()
 
-        ax1.cla()
+        #real plot   
+        # ax1.cla()
         
-        ax1.scatter(debugx0,debugy0,marker='*')
-        ax1.scatter(debugx1,debugy1,marker='*')
-        fig.show()
-        fig.canvas.draw()
-        # ln.set_data(debugx1,debugy1)
-        plt.pause(0.1)
-        plt.draw()
+        # ax1.scatter(debugx0,debugy0,marker='*')
+        # ax1.scatter(debugx1,debugy1,marker='*')
+        # fig.show()
+        # fig.canvas.draw()
+        
+        # plt.pause(0.01)
+        # plt.draw()
+        #real plot
 
         # plt.show(False) 
         # RealtimePloter() 
@@ -629,13 +676,16 @@ def main(datafile='unlocalized.data',cell_Size=0.1,Typ='1'):
         
         # plt.pause(1) 
         
+
         # print 'ongoing',debugx1[:4]
 
         #Use the Particle Filter to obtain the Corrected Odometry
         if(k>0 and Type!='-1'):
             (x00,y00,theta00) = (float(Onew[k-1][1]),float(Onew[k-1][2]),boundAngle(float(Onew[k-1][3])))
             #print '\n #Current Odometry:',float(O[k][1]),float(O[k][2]),boundAngle(float(O[k][3]))
-            #print '\n #Estimated odometry',float(Onew[k][1]),float(Onew[k][2]),boundAngle(float(Onew[k][3]))
+            # print '(previous position x00 %f ,y00 %f ,theta00 %f)' %(x00,y00,theta00)
+            # print '(current position x00 %f ,y00 %f ,theta00 %f)' %(c_x,c_y,theta)
+            # print '\n #Estimated odometry',float(Onew[k][1]),float(Onew[k][2]),boundAngle(float(Onew[k][3]))
             (c_x,c_y,theta) = localizer(particlesObj,x00,y00,theta00,c_x,c_y,theta,Snew)
             #print '\n #Corrected Odometry:',c_x,':',c_y,':',theta
             
@@ -645,6 +695,11 @@ def main(datafile='unlocalized.data',cell_Size=0.1,Typ='1'):
             xEnd=0
             yStart=yEnd
             yEnd=0
+
+        laserpositionx = []
+        laserpositiony = []    
+
+       
 
         for l in range(0,len(Snew),4):
             x0 = float(Snew[l])
@@ -660,6 +715,12 @@ def main(datafile='unlocalized.data',cell_Size=0.1,Typ='1'):
             #location of end points of the SONAR/Laser in the global coordinates 
             G_x1 = d*cos(theta+alpha1)+c_x
             G_y1 = d*sin(theta+alpha1)+c_y
+
+            #debug
+            laserpositionx.append(G_x1)
+            laserpositiony.append(G_y1)
+
+
             ########################## SET x0,y0 to the current coordinates of the robot.
             x0 = c_x
             y0 = c_y
@@ -699,18 +760,31 @@ def main(datafile='unlocalized.data',cell_Size=0.1,Typ='1'):
         locxcor.append(xloc)
         locycor.append(yloc)
 
+        # real plot   
+        ax1.cla()
+        
+        ax1.scatter(locxcor,locycor,marker='*')
+        ax1.scatter(laserpositionx,laserpositiony,marker='o')
+        
+        fig.show()
+        fig.canvas.draw()
+        
+        plt.pause(0.01)
+        plt.draw()
+        # real plot
 
+    plt.close()
     #debug
-    xcor =[]
-    ycor =[] 
-    for cnt in range(len(Onew)):
-        xcor.append(Onew[cnt][1])
-        ycor.append(Onew[cnt][2])
+    # xcor =[]
+    # ycor =[] 
+    # for cnt in range(len(Onew)):
+    #     xcor.append(Onew[cnt][1])
+    #     ycor.append(Onew[cnt][2])
 
-    fig = plt.figure(figsize=(20,10))
-    plt.plot(xcor, ycor, color='red', linestyle='--')
-    plt.plot(locxcor, locycor, color='blue')
-    plt.show()
+    # fig = plt.figure(figsize=(20,10))
+    # plt.plot(xcor, ycor, color='red', linestyle='--')
+    # plt.plot(locxcor, locycor, color='blue')
+    # plt.show()
     
 
     #magnify the grid so that it is more visible to the eyes.
@@ -732,6 +806,10 @@ def main(datafile='unlocalized.data',cell_Size=0.1,Typ='1'):
     writeImage(mgGrid,mp)
 
 
+    #debug
+    if debugshow == True:
+        logf.close()
+
 #Localizer method, handles all localization
 def localizer(particlesObj,x0,y0,phi0,x1,y1,phi1,sensorReadings):
     delx=x1-x0
@@ -745,13 +823,20 @@ def localizer(particlesObj,x0,y0,phi0,x1,y1,phi1,sensorReadings):
     else:
         alpha=-atan2(dely,delx)+phi0
 
+    # print 'x1 %f, x0 %f, y1 %f, y0 %f' %(x1,x0,y1,y0)
+    # print 'delx %f, dely %f delphi %f' %(delx, dely,delphi)
+    # print 'deltaS %f,alpha %f,delphi %f' % (deltaS,alpha,delphi)    
     particlesObj.updateParticles(deltaS,alpha,delphi)
 
+    # print 'Weight Calc Start\n'
+    
     #Reweight the particles
     for k in range(particlesObj.numParticles):
        weight = computeWeight(particlesObj,k,sensorReadings)
-       #print '\n Weight:',weight
+       # print '\n Weight:',weight
        particlesObj.updateWeights(k,weight)
+
+       
 
     #Normalize the weights to lie between 0.0 and 1.0
     particlesObj.normalizeWeights()
@@ -762,10 +847,28 @@ def localizer(particlesObj,x0,y0,phi0,x1,y1,phi1,sensorReadings):
     particlesObj.resampleParticles()
     return (x,y,theta)
 
+
+
+
+
 #used to compute and update the weights of each particle
 def computeWeight(particlesObj,k,sensorReadings):
+    # print 'computeWeight len grid ',len(Grid),len(Grid[0]),'gridSize',gridSize,'cellSize',cellSize
+
+
     c_x,c_y,theta=particlesObj.X[k],particlesObj.Y[k],particlesObj.Theta[k]
-    weight=0.0
+    weight=0.0 
+
+    #debug
+    global debugshow
+    global particle_cnt
+    particle_cnt = k
+
+
+    # for pcnt in range(particlesObj.numParticles):
+    #     print 'particle count %d particle x %f particle y %f particle theta %f ' %(pcnt,particlesObj.X[pcnt],particlesObj.Y[pcnt],particlesObj.Theta[pcnt])
+
+    #debug
     for k in range(0,len(sensorReadings),4):
         x0 = float(sensorReadings[k])
         y0 = float(sensorReadings[k+1])
@@ -781,38 +884,86 @@ def computeWeight(particlesObj,k,sensorReadings):
         #location of end points of the SONAR/Laser in the global coordinates 
         G_x1 = d*cos(theta+alpha1)+c_x
         G_y1 = d*sin(theta+alpha1)+c_y
+
+        #debug
+        sensor_origin = x0
+        sensor_origin = y0
+        #debug
+        
         ########################## SET x0,y0 to the current coordinates of the robot.
         x0 = c_x
         y0 = c_y
         ##########################
-            #location of the start point of the SONAR/Laser in global coordinates
+        #location of the start point of the SONAR/Laser in global coordinates
         d0 = sqrt(pow((x0-c_x),2)+pow((y0-c_y),2))
         #find slope of the line joining origin of the robot coordinates to the starting point of the laser
         alpha0 = atan2(y0,x0)
         G_x0 = d0*cos(theta+alpha0)+c_x
         G_y0 = d0*sin(theta+alpha0)+c_y
         
+
+        #debug 
+        if debugshow == True:
+            # print 'particle_cnt %d' %(particle_cnt)
+            # print 'particle x %f, particle y %f, particle theta %f, distance d %f distance d0 %f' %(c_x,c_y,theta,d,d0)
+            # print 'sensor origin x %f, sensor origin y %f x0 %f y0 %f' %(sensor_origin,sensor_origin,x0,y0)
+            # print 'sensor end x %f, sensor end y %f' %(x1,y1)
+            # print 'sensor laser G_x1 %f sensor laser G_y1 %f' %(G_x1,G_y1)
+            # print 'sensor laser G_x0 %f sensor laser G_y0 %f' %(G_x0,G_y0)
+
+            
+            logf.write('particle_cnt %d \n' %(particle_cnt))
+            logf.write('particle x %f, particle y %f, particle theta %f, distance d %f distance d0 %f \n' %(c_x,c_y,theta,d,d0))
+            logf.write('sensor origin x %f, sensor origin y %f x0 %f y0 %f \n' %(sensor_origin,sensor_origin,x0,y0))
+            logf.write('sensor end x %f, sensor end y %f \n' %(x1,y1))
+            logf.write('sensor laser G_x1 %f sensor laser G_y1 %f \n' %(G_x1,G_y1))
+            logf.write('sensor laser G_x0 %f sensor laser G_y0 %f \n' %(G_x0,G_y0))
+        #debug
+
+
         t=atan2((G_y1-G_y0),(G_x1-G_x0))
         #find euclidean distance between the two points
         d = sqrt(pow(G_x1-G_x0,2)+pow(G_y1-G_y0,2))
         #increment the occupancy belief of the cell lying on the endpoint of the laser
         x = int(round(G_x1/cellSize))
         y = int(round(G_y1/cellSize))
+
+        #debug
+        if debugshow == True:
+            # print 't %f d %f x %f y %f G_x1 %f G_y1 %f cellSize %f gridSize %f' %(t,d,x,y,G_x1,G_y1,cellSize,gridSize)
+            logf.write('t %f d %f x %f y %f G_x1 %f G_y1 %f cellSize %f gridSize %f \n' %(t,d,x,y,G_x1,G_y1,cellSize,gridSize))
+        #debug
+
         #transform to proper coordinates of array
         #the map appears to be more prominent in the lower half of Y-plane of the image, so let us shift X-axis further, 
         #so that the map is more visible (note X-axis in the array is the Y axis in the image.
         x += int(gridSize/(cellSize*6))
         y += int(gridSize/(cellSize*2))
+
+        #debug
+        if debugshow == True:
+            # print 'x %f y %f xadd %f yadd %f len(Grid) %f' %(x,y,int(gridSize/(cellSize*6)),int(gridSize/(cellSize*2)),len(Grid))
+            logf.write('x %f y %f xadd %f yadd %f len(Grid) %f \n' %(x,y,int(gridSize/(cellSize*6)),int(gridSize/(cellSize*2)),len(Grid)))
+        #debug
         # increase occupancy belief if the points lie within the map
         ON=0
         if(x>=0 and x<int(gridSize/cellSize) and y>=0 and y<int(gridSize/cellSize)):
             #Ray Terminates exactly on an obstacle
+
             for q in [-1,0,1]:
                 for r in [-1,0,1]:
+                    if debugshow == True:
+                        # print 'x %f r %f x+r %f y %f q %f y+q %f len(Grid) %f' %(x,r,x+r,y,q,y+q,len(Grid))
+                        # print 'Grid[x+r][y+q] %f weight %f ON %f' %(Grid[x+r][y+q],weight,ON)
+                        logf.write('x %f r %f x+r %f y %f q %f y+q %f len(Grid) %f \n' %(x,r,x+r,y,q,y+q,len(Grid)))
+                        logf.write('Grid[x+r][y+q] %f weight %f ON %f Grid[x+r][y+q] %f \n' %(Grid[x+r][y+q],weight,ON,Grid[x+r][y+q]))
                     if(x+r>0 and x+r<len(Grid) and y+q>0 and y+q<len(Grid)):
                         if(Grid[x+r][y+q]>30.0):
                             weight+=(12.0)
                             ON=1
+                            if debugshow == True:
+                                # print 'weight increase weight %f ON %f' %(weight,ON)
+                                logf.write('weight+=(12.0) weight %f ON %f \n' %(weight,ON))
 
         OUTSIDE=0
         if(ON==0):
@@ -828,13 +979,22 @@ def computeWeight(particlesObj,k,sensorReadings):
                     #so that the map is more visible (note X-axis in the array is the Y axis in the image.
                 x += int(gridSize/(cellSize*6))
                 y += int(gridSize/(cellSize*2))
-            
+
+                if debugshow == True:
+                    logf.write('OUTSIDE %f ON %f x %f y %f k %f d %f \n' %(OUTSIDE, ON, x,y,k,d))
+        
                 # decrement the value in the corresponding cell (if it is within our map)
                 if(x>=0 and x<int(gridSize/cellSize) and y>=0 and y<int(gridSize/cellSize) and k >0):
+                    if debugshow == True:
+                        logf.write('Grid[x][y] %f \n' %(Grid[x][y]))
+            
                     #Does Ray Terminate After an obstacle?
                     if(Grid[x][y]>30.0):
                         weight+=(4.0)
                         OUTSIDE=1
+                        if debugshow == True:
+                            logf.write('weight+=(4.0) weight %f OUTSIDE %f \n' %(weight,OUTSIDE))
+
                         break
                 
             #increment the occupancy belief of the cell lying on the endpoint of the laser
@@ -857,7 +1017,12 @@ def computeWeight(particlesObj,k,sensorReadings):
             #Ray has terminal before the obstacle
         if(OUTSIDE==0):
             weight+=8.0
-            
+     
+    #debug
+    # if particle_cnt == 2:
+    #     debugshow = True
+    #debug
+
     return weight
     
     
